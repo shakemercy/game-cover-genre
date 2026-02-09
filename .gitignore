@@ -1,0 +1,35 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.pkl
+*.pickle
+*.log
+
+# --- Envs ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- IDE/OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Training artifacts / large files ---
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.tflite
+
+# --- Data & output ---
+data/**
+outputs/**
+reports/**
