@@ -10,3 +10,4 @@ pyyaml
 pillow
 tensorboard
 grad-cam
+requests
