@@ -43,14 +43,14 @@ except ImportError:
 
 APPDETAILS_URL = "https://store.steampowered.com/api/appdetails"
 
-CACHE_DIR = Path("data/splits/appdetails_cache")
+BASE_DIR = Path(__file__).resolve().parents[2]
+CACHE_DIR = BASE_DIR / "data" / "splits" / "appdetails_cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 _meta_lock = threading.Lock()
 _meta_next_time = 0.0
 
 def rate_limit(min_interval: float):
-    """Global rate limiter across the whole process for metadata requests."""
     global _meta_next_time
     with _meta_lock:
         now = time.time()
@@ -69,7 +69,6 @@ DEFAULT_HEADERS = {
     "Accept": "application/json,text/html;q=0.9,*/*;q=0.8",
 }
 
-# Thread-local session for fast concurrent downloads
 _tls = threading.local()
 
 
@@ -77,10 +76,8 @@ def make_session(pool_maxsize: int = 64, add_age_gate_cookies: bool = True) -> r
     s = requests.Session()
     s.headers.update(DEFAULT_HEADERS)
 
-    # IMPORTANT: bypass Steam age gate for many games
     if add_age_gate_cookies:
-        # "birthtime" is a unix timestamp; any old date works
-        s.cookies.set("birthtime", "315532801")        # ~1980
+        s.cookies.set("birthtime", "315532801")    
         s.cookies.set("lastagecheckage", "1-January-1980")
         s.cookies.set("wants_mature_content", "1")
 
@@ -120,13 +117,8 @@ def safe_suffix_from_url(url: str) -> str:
 
 
 def atomic_download(url: str, dst: Path, timeout: int = 45, min_bytes: int = 6_000) -> bool:
-    """
-    Download URL to dst using a temp file + rename.
-    Returns True if downloaded or already exists with reasonable size.
-    """
     dst.parent.mkdir(parents=True, exist_ok=True)
 
-    # Skip if already present and looks non-empty
     if dst.exists() and dst.stat().st_size >= min_bytes:
         return True
 
@@ -169,11 +161,6 @@ def atomic_download(url: str, dst: Path, timeout: int = 45, min_bytes: int = 6_0
 
 
 def scan_covers(covers_dir: Path) -> Dict[int, Path]:
-    """
-    Returns mapping: appid -> genre_folder_path
-    Expects covers like: data/raw/<GENRE>/<APPID>.jpg (stem digits)
-    Skips already-downloaded gameplay files (*_gp*.ext).
-    """
     mapping: Dict[int, Path] = {}
     for p in covers_dir.rglob("*"):
         if not p.is_file():
@@ -214,10 +201,8 @@ def fetch_appdetails_single(appid: int, sess: requests.Session, timeout: int = 2
         "filters": "basic,screenshots",
     }
 
-    # throttle
     rate_limit(min_interval)
 
-    # simple backoff loop for 429/5xx
     backoff = 2.0
     for _ in range(6):
         try:
@@ -238,7 +223,6 @@ def fetch_appdetails_single(appid: int, sess: requests.Session, timeout: int = 2
                 pass
             return j
 
-        # hit rate limit or server hiccup -> wait and retry
         if r.status_code in (429, 500, 502, 503, 504):
             ra = r.headers.get("Retry-After")
             if ra:
@@ -251,7 +235,6 @@ def fetch_appdetails_single(appid: int, sess: requests.Session, timeout: int = 2
             backoff = min(30.0, backoff * 1.7)
             continue
 
-        # other errors -> don't hammer
         return {}
 
     return {}
@@ -259,7 +242,6 @@ def fetch_appdetails_single(appid: int, sess: requests.Session, timeout: int = 2
 
 
 def fetch_appdetails_batch(appids: List[int], sess: requests.Session, timeout: int = 20, debug: bool = False) -> Dict:
-    # Batch endpoint je kod tebe blokiran (400/null), pa direktno radimo single + cache + throttle.
     merged: Dict = {}
     for a in appids:
         one = fetch_appdetails_single(a, sess, timeout=timeout, min_interval=0.6)
@@ -393,7 +375,6 @@ def main():
         for appid, genre_dir in batch:
             payload = batch_data.get(str(appid)) or {}
 
-            # Always print first N samples (regardless of tasks)
             if debug_left > 0:
                 succ = payload.get("success")
                 d = payload.get("data")
