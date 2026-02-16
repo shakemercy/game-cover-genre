@@ -1,34 +1,55 @@
-from pathlib import Path
 import csv
+from pathlib import Path
 
-IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 ROOT = Path("data/raw")
 OUT = Path("outputs/class_dist.csv")
 
-def img_files(p: Path):
-    return [f for f in p.iterdir() if f.is_file() and f.suffix.lower() in IMG_EXTS]
+EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+
+def count_images(folder: Path):
+    n = 0
+    for p in folder.iterdir():
+        if p.is_file() and p.suffix.lower() in EXTS:
+            n += 1
+    return n
 
 rows = []
+total_images = 0
 total_triplets = 0
-total_imgs = 0
 
-for cdir in sorted([d for d in ROOT.iterdir() if d.is_dir()], key=lambda x: x.name.lower()):
-    subdirs = [d for d in cdir.iterdir() if d.is_dir()]
-    if subdirs:
-        triplets = len(subdirs)
-        imgs = sum(len(img_files(d)) for d in subdirs)
+class_folders = []
+for p in ROOT.iterdir():
+    if p.is_dir():
+        class_folders.append(p)
+
+class_folders.sort(key=str)
+
+for class_dir in class_folders:
+    subfolders = []
+    for p in class_dir.iterdir():
+        if p.is_dir():
+            subfolders.append(p)
+
+    if len(subfolders) > 0:
+        imgs = 0
+        for sf in subfolders:
+            imgs += count_images(sf)
+        triplets = len(subfolders)
     else:
-        imgs = len(img_files(cdir))
+        imgs = count_images(class_dir)
         triplets = imgs // 3
 
-    rows.append((cdir.name, triplets, imgs))
+    rows.append((class_dir.name, imgs, imgs, triplets))
+    total_images += imgs
     total_triplets += triplets
-    total_imgs += imgs
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
-with OUT.open("w", newline="", encoding="utf-8") as f:
-    w = csv.writer(f)
-    w.writerow(["class", "triplets", "image_files"])
-    w.writerows(rows)
+f = OUT.open("w", newline="", encoding="utf-8")
+w = csv.writer(f)
+w.writerow(["class", "total", "kept", "triplets"])
+for r in rows:
+    w.writerow(r)
+f.close()
 
-print(f"Wrote {OUT} | classes={len(rows)} triplets={total_triplets} images={total_imgs}")
+print("WROTE:", OUT)
+print("classes:", len(rows), "images:", total_images, "triplets:", total_triplets)
