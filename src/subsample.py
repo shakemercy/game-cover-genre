@@ -78,4 +78,4 @@ with CSV_PATH.open("w", newline = "") as f:
         w.writerow(r)
 
 print("NAPRAVLJEN -> ", OUTPUT)
-print("INFO FAJL -> ", CSV_PATH)
+print("DIST FAJL -> ", CSV_PATH)
