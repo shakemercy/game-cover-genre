@@ -1,85 +1,81 @@
-import csv
+from pathlib import Path
 import random
 import re
 import shutil
-from pathlib import Path
+import csv
 
-IN_DIR = Path("data/raw")
-OUT_DIR = Path("data/balanced_raw")
-MAX_GAMES_PER_CLASS = 1000
-SEED = 42
+INPUT = Path("data/raw")
+OUTPUT = Path("data/balanced_raw")
+CSV_PATH = Path("outputs/sub_dist.csv")
 
-EXTS = {".jpg", ".jpeg", ".png", ".webp"}
-OUT_CSV = Path("outputs/sub_dist.csv")
+random.seed(42)
+OUTPUT.mkdir(exist_ok = True)
+CSV_PATH.parent.mkdir(exist_ok = True)
 
-random.seed(SEED)
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-OUT_CSV.parent.mkdir(parents=True, exist_ok=True)
+MAX_GAMES = 1000
 
-pat = re.compile(r"^(\d+)(?:_(gp[12]))?$", re.IGNORECASE)
-
-def parse_file(p: Path):
-    m = pat.match(p.stem)
-    if not m:
-        return None
-    game_id = m.group(1)
-    kind = m.group(2) or "cover"
-    ext = p.suffix.lower()
-    return game_id, kind.lower(), ext
+regex = re.compile(r"^(\d+)_?(gp[12])?$")
 
 rows = []
 
-class_dirs = [d for d in IN_DIR.iterdir() if d.is_dir()]
-class_dirs.sort(key=lambda x: str(x))
+classes = [d for d in INPUT.iterdir() if d.is_dir()]
+classes.sort(key = lambda x : str(x))
 
-for class_dir in class_dirs:
+def parse(img: Path):
+    m = regex.match(img.stem)
+    if not m:
+        return None
+    game_id = m.group(1)
+    img_type = m.group(2) or "main"
+    ext = img.suffix
+    return game_id, img_type, ext
+
+for class_dir in classes:
     games = {}
-    for p in class_dir.rglob("*"):
-        if not p.is_file():
+    for img in class_dir.iterdir():
+        if not img.is_file() or img.suffix != ".jpg":
             continue
-        if p.suffix.lower() not in EXTS:
+        game = parse(img)
+        if game is None:
             continue
-        info = parse_file(p)
-        if info is None:
-            continue
-        game_id, kind, ext = info
-        games.setdefault(game_id, {})
-        if kind not in games[game_id]:
-            games[game_id][kind] = p
+        game_id, img_type, ext = game
+        if game_id not in games:
+            games[game_id] = {}
+        games[game_id][img_type] = img
 
     game_ids = list(games.keys())
     game_ids.sort()
     random.shuffle(game_ids)
 
-    kept_ids = game_ids[:MAX_GAMES_PER_CLASS]
+    selected = game_ids[:MAX_GAMES]
 
-    target_dir = OUT_DIR / class_dir.name
-    target_dir.mkdir(parents=True, exist_ok=True)
+    output = OUTPUT / class_dir.name
+    output.mkdir(exist_ok = True)
 
-    kept_images = 0
-    for gid in kept_ids:
-        items = games[gid]
-        for kind in ["cover", "gp1", "gp2"]:
-            if kind not in items:
+    img_counter = 0
+    for gid in selected:
+        images = games[gid]
+        for img_type in ["main", "gp1", "gp2"]:
+            if img_type not in images:
                 continue
-            src = items[kind]
-            ext = src.suffix.lower()
-            if kind == "cover":
-                dst_name = f"{gid}{ext}"
+            src = images[img_type]
+            ext = src.suffix
+            if img_type == "main":
+                out_name = f"{gid}{ext}"
             else:
-                dst_name = f"{gid}_{kind}{ext}"
-            dst = target_dir / dst_name
-            shutil.copy2(src, dst)
-            kept_images += 1
+                out_name = f"{gid}_{img_type}{ext}"
+            out = output / out_name
+            shutil.copy(src, out)
+            img_counter += 1
+    
+    img_total = sum(len(games[k]) for k in games.keys())
+    rows.append((class_dir.name, len(game_ids), len(selected), img_total, img_counter))
 
-    total_images = sum(len(games[k]) for k in games.keys())
-    rows.append((class_dir.name, len(game_ids), len(kept_ids), total_images, kept_images))
-
-with OUT_CSV.open("w", newline="", encoding="utf-8") as f:
+with CSV_PATH.open("w", newline = "") as f:
     w = csv.writer(f)
-    w.writerow(["class", "total_games", "kept_games", "total_images", "kept_images"])
+    w.writerow(["class", "games_all", "games_selected", "images_all", "images_selected"])
     for r in rows:
         w.writerow(r)
 
-print("DONE:", OUT_DIR)
-print("WROTE:", OUT_CSV)
+print("NAPRAVLJEN -> ", OUTPUT)
+print("INFO FAJL -> ", CSV_PATH)

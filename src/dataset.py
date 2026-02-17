@@ -6,7 +6,6 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 
-
 class TripletDataset(Dataset):
     def __init__(self, root_dir, indices, transform):
         self.samples = []

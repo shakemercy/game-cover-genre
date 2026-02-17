@@ -1,55 +1,33 @@
-import csv
 from pathlib import Path
+import csv
 
 ROOT = Path("data/raw")
-OUT = Path("outputs/class_dist.csv")
-
-EXTS = {".jpg", ".jpeg", ".png", ".webp"}
-
-def count_images(folder: Path):
-    n = 0
-    for p in folder.iterdir():
-        if p.is_file() and p.suffix.lower() in EXTS:
-            n += 1
-    return n
+CSV_PATH = Path("outputs/raw_dist.csv")
 
 rows = []
 total_images = 0
-total_triplets = 0
+total_games = 0
 
-class_folders = []
-for p in ROOT.iterdir():
-    if p.is_dir():
-        class_folders.append(p)
-
+class_folders = [p for p in ROOT.iterdir() if p.is_dir()]
 class_folders.sort(key=str)
 
 for class_dir in class_folders:
-    subfolders = []
-    for p in class_dir.iterdir():
-        if p.is_dir():
-            subfolders.append(p)
+    images = 0
+    for img in class_dir.iterdir():
+        if img.is_file() and img.suffix == ".jpg":
+            images += 1
 
-    if len(subfolders) > 0:
-        imgs = 0
-        for sf in subfolders:
-            imgs += count_images(sf)
-        triplets = len(subfolders)
-    else:
-        imgs = count_images(class_dir)
-        triplets = imgs // 3
+    games = images // 3
 
-    rows.append((class_dir.name, imgs, imgs, triplets))
-    total_images += imgs
-    total_triplets += triplets
+    rows.append((class_dir.name, images, games))
+    total_images += images
+    total_games += games
 
-OUT.parent.mkdir(parents=True, exist_ok=True)
-f = OUT.open("w", newline="", encoding="utf-8")
-w = csv.writer(f)
-w.writerow(["class", "total", "kept", "triplets"])
-for r in rows:
-    w.writerow(r)
-f.close()
+with CSV_PATH.open("w", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["class", "images", "games"])
+    for r in rows:
+        w.writerow(r)
 
-print("WROTE:", OUT)
-print("classes:", len(rows), "images:", total_images, "triplets:", total_triplets)
+print("NAPRAVLJEN -> ", CSV_PATH)
+print("classes:", len(rows), "images:", total_images, "games:", total_games)

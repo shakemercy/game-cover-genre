@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 
 class BaselineCNN(nn.Module):
-    def __init__(self, num_classes: int, in_channels: int = 3, img_size: int = 224):
+    def __init__(self, classes: int, channels: int = 3, img_size: int = 224):
         super().__init__()
 
         self.features = nn.Sequential(
-            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),
+            nn.Conv2d(channels, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2),
@@ -24,19 +24,19 @@ class BaselineCNN(nn.Module):
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
+            nn.MaxPool2d(2)
         )
 
         with torch.no_grad():
-            x = torch.zeros(1, in_channels, img_size, img_size)
+            x = torch.zeros(1, channels, img_size, img_size)
             y = self.features(x)
-            flat_dim = y.view(1, -1).shape[1]
+            flat = y.shape[1] * y.shape[2] * y.shape[3]
 
         self.classifier = nn.Sequential(
-            nn.Linear(flat_dim, 512),
+            nn.Linear(flat, 512),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.3),
-            nn.Linear(512, num_classes),
+            nn.Linear(512, classes)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
